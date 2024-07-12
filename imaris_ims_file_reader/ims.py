@@ -9,20 +9,21 @@ from skimage.transform import rescale
 
 # Convienence Function:  Will handle opening as a ims_reader class or zarr store based on the aszarr:Bool
 def ims(file, ResolutionLevelLock=0, write=False, cache_location=None, mem_size=None, disk_size=2000, squeeze_output=True,
-             resolution_decimal_places = 3, 
+             resolution_decimal_places = 3, verbose=False,
              aszarr=False):
     if aszarr:
         from imaris_ims_file_reader import ims_zarr_store
-        return ims_zarr_store.ims_zarr_store(file,ResolutionLevelLock=ResolutionLevelLock)
+        return ims_zarr_store.ims_zarr_store(file,ResolutionLevelLock=ResolutionLevelLock, write=write, verbose=verbose)
     else:
         return ims_reader(
-            file, ResolutionLevelLock=ResolutionLevelLock, 
-            write=write, 
-            cache_location=cache_location, 
-            mem_size=mem_size, 
-            disk_size=disk_size, 
+            file, ResolutionLevelLock=ResolutionLevelLock,
+            write=write,
+            cache_location=cache_location,
+            mem_size=mem_size,
+            disk_size=disk_size,
             squeeze_output=squeeze_output,
-            resolution_decimal_places=resolution_decimal_places
+            resolution_decimal_places=resolution_decimal_places,
+            verbose=verbose
             )
     
     
@@ -31,12 +32,12 @@ def ims(file, ResolutionLevelLock=0, write=False, cache_location=None, mem_size=
 class ims_reader:
     
     def __init__(self, file, ResolutionLevelLock=0, write=False, cache_location=None, mem_size=None, disk_size=2000, squeeze_output=True,
-                 resolution_decimal_places = 3
+                 resolution_decimal_places = 3, verbose=False
                  ):
         
         ##  mem_size = in gigabytes that remain FREE as cache fills
         ##  disk_size = in gigabytes that remain FREE as cache fills
-        ## NOTE: Caching is currently not implemented.  
+        ## NOTE: Caching is currently not implemented.
         
         self.filePathComplete = file
         self.write = write
@@ -57,7 +58,7 @@ class ims_reader:
         self.metaData = {}
         self.ResolutionLevelLock = ResolutionLevelLock
         self.resolution_decimal_places = resolution_decimal_places
-        
+        self.verbose = verbose
 
         resolution_0 = self.dataset['ResolutionLevel 0']
         time_point_0 = resolution_0['TimePoint 0']
@@ -123,7 +124,7 @@ class ims_reader:
             try:
                 self.metaData[r, t, c, 'HistogramMax'] = int(float(self.read_attribute(location_attr, 'HistogramMax')))
             except:
-                warntxt = '''HistogramMax value is not present for resolution {}, time {}, channel {}. 
+                warntxt = '''HistogramMax value is not present for resolution {}, time {}, channel {}.
                               This may cause compatibility issues with programs that use imaris_ims_file_reader'''.format(r,t,c)
                 warnings.warn(warntxt)
             try:
@@ -180,12 +181,14 @@ class ims_reader:
         
     def open(self):
         if self.write == False:
-            print('Opening readonly file: {} \n'.format(self.filePathComplete))
+            if self.verbose:
+                print('Opening readonly file: {} \n'.format(self.filePathComplete))
             self.hf = h5py.File(self.filePathComplete, 'r', swmr=True)
             self.dataset = self.hf['DataSet']
             # print('OPENED file: {} \n'.format(self.filePathComplete))
         elif self.write == True:
-            print('Opening writeable file: {} \n'.format(self.filePathComplete))
+            if self.verbose:
+                print('Opening writeable file: {} \n'.format(self.filePathComplete))
             self.hf = h5py.File(self.filePathComplete, 'a', swmr=True)
             self.dataset = self.hf['DataSet']
             # print('OPENED file: {} \n'.format(self.filePathComplete))
@@ -196,9 +199,11 @@ class ims_reader:
     def close(self):
         ## Implement flush?
         if self.write == True:
-            print('Flushing Buffers to Disk')
+            if self.verbose:
+                print('Flushing Buffers to Disk')
             self.hf.flush()
-        print('Closing file: {} \n'.format(self.filePathComplete))
+        if self.verbose:
+            print('Closing file: {} \n'.format(self.filePathComplete))
         if self.hf is not None:
             self.hf.close()
         self.hf = None
@@ -222,7 +227,7 @@ class ims_reader:
         This option enables a 5D slicing to lock on to a specified resolution level.
         """
 
-        res, key = self.transform_key(key)        
+        res, key = self.transform_key(key)
 
         slice_returned = self.get_slice(
             r=res if res is not None else 0,  # Force ResolutionLock of None to be 0 when slicing
@@ -404,10 +409,10 @@ class ims_reader:
         #             output_array[idxt, idxc, :, :, :] = hf[d_set_string][z, y, x]
 
         """
-        The return statements can provide some specific use cases for when the 
+        The return statements can provide some specific use cases for when the
         class is providing data to Napari.
         
-        Currently, a custom print statement provides visual feed back that 
+        Currently, a custom print statement provides visual feed back that
         data are loading and what specific data is requested / returned
         
         The napari_imaris_loader currently hard codes os.environ["NAPARI_ASYNC"] == '1'
@@ -443,11 +448,12 @@ class ims_reader:
         # if isinstance(newData,int):
         toWrite = np.zeros((len(t_size), len(c_size), z_size, y_size, x_size), dtype=self.dtype)
         toWrite[:] = newData
-        print(toWrite.shape)
-        print(toWrite)
+        if self.verbose:
+            print(toWrite.shape)
+            print(toWrite)
 
-        print(t_size)    
-        print(t_size)
+            print(t_size)
+            print(t_size)
         for idxt, t in enumerate(t_size):
             for idxc, c in enumerate(c_size):
                 ## Below method is faster than all others tried
@@ -473,9 +479,9 @@ class ims_reader:
         
         projection_type = STR: 'min', 'max', 'mean',
         time_point = INT,
-        channel = INT, 
-        z = tuple (zStart, zStop), 
-        y = None or (yStart,yStop), 
+        channel = INT,
+        z = tuple (zStart, zStop),
+        y = None or (yStart,yStop),
         z = None or (xStart,xStop)
         resolution_level = INT >=0 : 0 is the highest resolution
         """
@@ -502,19 +508,22 @@ class ims_reader:
         elif isinstance(z, tuple):
             x = slice(y[0], y[1], 1)
     
-        image = None    
+        image = None
         for num, z_layer in enumerate(z):
             
-            print('Reading layer ' + str(num) + ' of ' + str(z))
+            if self.verbose:
+                print('Reading layer ' + str(num) + ' of ' + str(z))
             if image is None:
                 image = self[resolution_level, time_point, channel, z_layer, y, x]
-                print(image.dtype)
+                if self.verbose:
+                    print(image.dtype)
                 if projection_type == 'mean':
                     image = img_as_float32(image)
             else:
                 imageNew = self[resolution_level, time_point, channel, z_layer, y, x]
 
-                print('Incoroprating layer ' + str(num) + ' of ' + str(z))
+                if self.verbose:
+                    print('Incoroprating layer ' + str(num) + ' of ' + str(z))
 
                 if projection_type == 'max':
                     image[:] = np.maximum(image,imageNew)
@@ -535,8 +544,8 @@ class ims_reader:
     ):
         """
         This function extracts a  time_point and channel at a specific resolution.
-        The function extracts the whole volume at the highest resolution_level without 
-        going below the designated output_resolution.  It then resizes to the volume 
+        The function extracts the whole volume at the highest resolution_level without
+        going below the designated output_resolution.  It then resizes to the volume
         to the specified resolution by using the skimage rescale function.
         
         The option to turn off anti_aliasing during skimage.rescale (anti_aliasing=False) is provided.
@@ -555,12 +564,15 @@ class ims_reader:
                 resolutionLevelToExtract = res
 
         workingVolumeResolution = self.metaData[resolutionLevelToExtract,time_point,channel,'resolution']
-        print('Reading ResolutionLevel {}'.format(resolutionLevelToExtract))
+        if self.verbose:
+            print('Reading ResolutionLevel {}'.format(resolutionLevelToExtract))
         workingVolume = self.get_Resolution_Level(resolutionLevelToExtract,time_point=time_point,channel=channel)
 
-        print('Resizing volume from resolution in microns {} to {}'.format(str(workingVolumeResolution), str(output_resolution)))
+        if self.verbose:
+            print('Resizing volume from resolution in microns {} to {}'.format(str(workingVolumeResolution), str(output_resolution)))
         rescaleFactor = tuple([round(x/y,5) for x,y in zip(workingVolumeResolution,output_resolution)])
-        print('Rescale Factor = {}'.format(rescaleFactor))
+        if self.verbose:
+            print('Rescale Factor = {}'.format(rescaleFactor))
 
         workingVolume = img_as_float32(workingVolume)
         workingVolume = rescale(workingVolume, rescaleFactor, anti_aliasing=anti_aliasing)

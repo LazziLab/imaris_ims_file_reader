@@ -7,9 +7,9 @@ Created on Tue Jul 19 10:29:42 2022
 
 '''
 A Zarr store that uses HDF5 as a containiner to shard chunks accross a single
-axis.  The store is implemented similar to a directory store 
+axis.  The store is implemented similar to a directory store
 but on axis[-3] HDF5 files are written which contain
-chunks cooresponding to the remainining axes.  If the shape of the 
+chunks cooresponding to the remainining axes.  If the shape of the
 the array are less than 3 axdes, the shards will be accross axis0
 
 Example:
@@ -69,7 +69,7 @@ class ims_zarr_store(Store):
     Zarr storage adapter for reading IMS files
     """
 
-    def __init__(self, ims_file, ResolutionLevelLock = 0, writeable=False, normalize_keys=True, verbose=True, mode='r'):
+    def __init__(self, ims_file, ResolutionLevelLock = 0, write=False, normalize_keys=False, verbose=False):
 
         # guard conditions
         assert os.path.splitext(ims_file)[-1].lower() == '.ims'
@@ -80,7 +80,7 @@ class ims_zarr_store(Store):
         self.ResolutionLevelLock = ResolutionLevelLock
         self.normalize_keys = normalize_keys
         self.verbose = verbose #bool or int >= 1
-        self.writeable = writeable
+        self.write = write
         self._files = ['.zarray','.zgroup','.zattrs','.zmetadata']
         self.ims = self.open_ims()
         self.ResolutionLevels = self.ims.ResolutionLevels
@@ -95,7 +95,7 @@ class ims_zarr_store(Store):
     def open_ims(self):
         return ims.ims(self.path,
                             ResolutionLevelLock=self.ResolutionLevelLock,
-                            write=self.writeable,squeeze_output=False)
+                            write=self.write,squeeze_output=False)
         
         
     def _normalize_key(self, key):
@@ -119,7 +119,8 @@ class ims_zarr_store(Store):
         return index
     
     def _fromfile(self,index):
-        print(index)
+        if self.verbose:
+            print(index)
         array = self.ims[
             self.ResolutionLevelLock,
             index[0][0]:index[0][1],
@@ -128,9 +129,11 @@ class ims_zarr_store(Store):
             index[3][0]:index[3][1],
             index[4][0]:index[4][1]
             ]
-        print(array.shape)
+        if self.verbose:
+            print(array.shape)
         if array.shape == self.chunks:
-            print(True)
+            if self.verbose:
+                print(True)
             return array
         else:
             canvas = np.zeros(self.chunks,dtype=array.dtype)
@@ -316,4 +319,3 @@ class ims_zarr_store(Store):
         if self.verbose == 2:
             print('__len__')
         return len(self.keys())
-
