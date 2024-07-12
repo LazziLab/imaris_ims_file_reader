@@ -32,7 +32,7 @@ def ims(file, ResolutionLevelLock=0, write=False, cache_location=None, mem_size=
 class ims_reader:
     
     def __init__(self, file, ResolutionLevelLock=0, write=False, cache_location=None, mem_size=None, disk_size=2000, squeeze_output=True,
-                 resolution_decimal_places = 3, verbose=False
+                 resolution_decimal_places = 3, verbose=False,
                  ):
         
         ##  mem_size = in gigabytes that remain FREE as cache fills
@@ -41,6 +41,7 @@ class ims_reader:
         
         self.filePathComplete = file
         self.write = write
+        self.verbose = verbose
         self.open()
         self.filePathBase = os.path.split(file)[0]
         self.fileName = os.path.split(file)[1]
@@ -58,7 +59,6 @@ class ims_reader:
         self.metaData = {}
         self.ResolutionLevelLock = ResolutionLevelLock
         self.resolution_decimal_places = resolution_decimal_places
-        self.verbose = verbose
 
         resolution_0 = self.dataset['ResolutionLevel 0']
         time_point_0 = resolution_0['TimePoint 0']
