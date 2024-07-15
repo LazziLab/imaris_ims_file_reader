@@ -95,7 +95,7 @@ class ims_zarr_store(Store):
     def open_ims(self):
         return ims.ims(self.path,
                             ResolutionLevelLock=self.ResolutionLevelLock,
-                            write=self.write,squeeze_output=False)
+                            write=self.write,squeeze_output=False,verbose=self.verbose)
         
         
     def _normalize_key(self, key):
